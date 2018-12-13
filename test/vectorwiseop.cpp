@@ -15,7 +15,6 @@
 
 template<typename ArrayType> void vectorwiseop_array(const ArrayType& m)
 {
-  typedef typename ArrayType::Index Index;
   typedef typename ArrayType::Scalar Scalar;
   typedef Array<Scalar, ArrayType::RowsAtCompileTime, 1> ColVectorType;
   typedef Array<Scalar, 1, ArrayType::ColsAtCompileTime> RowVectorType;
@@ -129,7 +128,6 @@ template<typename ArrayType> void vectorwiseop_array(const ArrayType& m)
 
 template<typename MatrixType> void vectorwiseop_matrix(const MatrixType& m)
 {
-  typedef typename MatrixType::Index Index;
   typedef typename MatrixType::Scalar Scalar;
   typedef typename NumTraits<Scalar>::Real RealScalar;
   typedef Matrix<Scalar, MatrixType::RowsAtCompileTime, 1> ColVectorType;
@@ -199,11 +197,23 @@ template<typename MatrixType> void vectorwiseop_matrix(const MatrixType& m)
     VERIFY_RAISES_ASSERT(m1.rowwise() - rowvec.transpose());
   }
 
-  // test norm
-  rrres = m1.colwise().norm();
-  VERIFY_IS_APPROX(rrres(c), m1.col(c).norm());
-  rcres = m1.rowwise().norm();
-  VERIFY_IS_APPROX(rcres(r), m1.row(r).norm());
+  // ------ partial reductions ------
+
+  #define TEST_PARTIAL_REDUX_BASIC(FUNC,ROW,COL,PREPROCESS) {                          \
+    ROW = m1 PREPROCESS .colwise().FUNC ;                                              \
+    for(Index k=0; k<cols; ++k) VERIFY_IS_APPROX(ROW(k), m1.col(k) PREPROCESS .FUNC ); \
+    COL = m1 PREPROCESS .rowwise().FUNC ;                                              \
+    for(Index k=0; k<rows; ++k) VERIFY_IS_APPROX(COL(k), m1.row(k) PREPROCESS .FUNC ); \
+  }
+
+  TEST_PARTIAL_REDUX_BASIC(sum(),        rowvec,colvec,EIGEN_EMPTY);
+  TEST_PARTIAL_REDUX_BASIC(prod(),       rowvec,colvec,EIGEN_EMPTY);
+  TEST_PARTIAL_REDUX_BASIC(mean(),       rowvec,colvec,EIGEN_EMPTY);
+  TEST_PARTIAL_REDUX_BASIC(minCoeff(),   rrres, rcres, .real());
+  TEST_PARTIAL_REDUX_BASIC(maxCoeff(),   rrres, rcres, .real());
+  TEST_PARTIAL_REDUX_BASIC(norm(),       rrres, rcres, EIGEN_EMPTY);
+  TEST_PARTIAL_REDUX_BASIC(squaredNorm(),rrres, rcres, EIGEN_EMPTY);
+  TEST_PARTIAL_REDUX_BASIC(redux(internal::scalar_sum_op<Scalar,Scalar>()),rowvec,colvec,EIGEN_EMPTY);
 
   VERIFY_IS_APPROX(m1.cwiseAbs().colwise().sum(), m1.colwise().template lpNorm<1>());
   VERIFY_IS_APPROX(m1.cwiseAbs().rowwise().sum(), m1.rowwise().template lpNorm<1>());
@@ -239,12 +249,13 @@ template<typename MatrixType> void vectorwiseop_matrix(const MatrixType& m)
   VERIFY_EVALUATION_COUNT( m2 = (m1.rowwise() - m1.colwise().sum()/RealScalar(m1.rows())), (MatrixType::RowsAtCompileTime!=1 ? 1 : 0) );
 }
 
-void test_vectorwiseop()
+EIGEN_DECLARE_TEST(vectorwiseop)
 {
   CALL_SUBTEST_1( vectorwiseop_array(Array22cd()) );
   CALL_SUBTEST_2( vectorwiseop_array(Array<double, 3, 2>()) );
   CALL_SUBTEST_3( vectorwiseop_array(ArrayXXf(3, 4)) );
   CALL_SUBTEST_4( vectorwiseop_matrix(Matrix4cf()) );
+  CALL_SUBTEST_5( vectorwiseop_matrix(Matrix4f()) );
   CALL_SUBTEST_5( vectorwiseop_matrix(Matrix<float,4,5>()) );
   CALL_SUBTEST_6( vectorwiseop_matrix(MatrixXd(internal::random<int>(1,EIGEN_TEST_MAX_SIZE), internal::random<int>(1,EIGEN_TEST_MAX_SIZE))) );
   CALL_SUBTEST_7( vectorwiseop_matrix(VectorXd(internal::random<int>(1,EIGEN_TEST_MAX_SIZE))) );

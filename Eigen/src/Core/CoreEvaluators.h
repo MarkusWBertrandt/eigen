@@ -136,7 +136,9 @@ template<typename Scalar,int OuterStride> class plainobjectbase_evaluator_data {
 public:
   EIGEN_DEVICE_FUNC plainobjectbase_evaluator_data(const Scalar* ptr, Index outerStride) : data(ptr)
   {
-    EIGEN_ONLY_USED_FOR_DEBUG(outerStride);
+#ifndef EIGEN_INTERNAL_DEBUGGING
+    EIGEN_UNUSED_VARIABLE(outerStride);
+#endif
     eigen_internal_assert(outerStride==OuterStride);
   }
   EIGEN_DEVICE_FUNC Index outerStride() const { return OuterStride; }
@@ -1034,7 +1036,7 @@ struct evaluator<Block<ArgType, BlockRows, BlockCols, InnerPanel> >
     OuterStrideAtCompileTime = HasSameStorageOrderAsArgType
                              ? int(outer_stride_at_compile_time<ArgType>::ret)
                              : int(inner_stride_at_compile_time<ArgType>::ret),
-    MaskPacketAccessBit = (InnerStrideAtCompileTime == 1) ? PacketAccessBit : 0,
+    MaskPacketAccessBit = (InnerStrideAtCompileTime == 1 || HasSameStorageOrderAsArgType) ? PacketAccessBit : 0,
     
     FlagsLinearAccessBit = (RowsAtCompileTime == 1 || ColsAtCompileTime == 1 || (InnerPanel && (evaluator<ArgType>::Flags&LinearAccessBit))) ? LinearAccessBit : 0,    
     FlagsRowMajorBit = XprType::Flags&RowMajorBit,
@@ -1044,7 +1046,9 @@ struct evaluator<Block<ArgType, BlockRows, BlockCols, InnerPanel> >
     Flags = Flags0 | FlagsLinearAccessBit | FlagsRowMajorBit,
     
     PacketAlignment = unpacket_traits<PacketScalar>::alignment,
-    Alignment0 = (InnerPanel && (OuterStrideAtCompileTime!=Dynamic) && (((OuterStrideAtCompileTime * int(sizeof(Scalar))) % int(PacketAlignment)) == 0)) ? int(PacketAlignment) : 0,
+    Alignment0 = (InnerPanel && (OuterStrideAtCompileTime!=Dynamic)
+                             && (OuterStrideAtCompileTime!=0)
+                             && (((OuterStrideAtCompileTime * int(sizeof(Scalar))) % int(PacketAlignment)) == 0)) ? int(PacketAlignment) : 0,
     Alignment = EIGEN_PLAIN_ENUM_MIN(evaluator<ArgType>::Alignment, Alignment0)
   };
   typedef block_evaluator<ArgType, BlockRows, BlockCols, InnerPanel> block_evaluator_type;
@@ -1075,14 +1079,16 @@ struct unary_evaluator<Block<ArgType, BlockRows, BlockCols, InnerPanel>, IndexBa
   EIGEN_DEVICE_FUNC explicit unary_evaluator(const XprType& block)
     : m_argImpl(block.nestedExpression()), 
       m_startRow(block.startRow()), 
-      m_startCol(block.startCol()) 
+      m_startCol(block.startCol()),
+      m_linear_offset(ForwardLinearAccess?(ArgType::IsRowMajor ? block.startRow()*block.nestedExpression().cols() + block.startCol() : block.startCol()*block.nestedExpression().rows() + block.startRow()):0)
   { }
  
   typedef typename XprType::Scalar Scalar;
   typedef typename XprType::CoeffReturnType CoeffReturnType;
 
   enum {
-    RowsAtCompileTime = XprType::RowsAtCompileTime
+    RowsAtCompileTime = XprType::RowsAtCompileTime,
+    ForwardLinearAccess = (InnerPanel || int(XprType::IsRowMajor)==int(ArgType::IsRowMajor)) && bool(evaluator<ArgType>::Flags&LinearAccessBit)
   };
  
   EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
@@ -1094,7 +1100,10 @@ struct unary_evaluator<Block<ArgType, BlockRows, BlockCols, InnerPanel>, IndexBa
   EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
   CoeffReturnType coeff(Index index) const
   { 
-    return coeff(RowsAtCompileTime == 1 ? 0 : index, RowsAtCompileTime == 1 ? index : 0);
+    if (ForwardLinearAccess)
+      return m_argImpl.coeff(m_linear_offset.value() + index); 
+    else
+      return coeff(RowsAtCompileTime == 1 ? 0 : index, RowsAtCompileTime == 1 ? index : 0);
   }
 
   EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
@@ -1106,7 +1115,10 @@ struct unary_evaluator<Block<ArgType, BlockRows, BlockCols, InnerPanel>, IndexBa
   EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
   Scalar& coeffRef(Index index)
   { 
-    return coeffRef(RowsAtCompileTime == 1 ? 0 : index, RowsAtCompileTime == 1 ? index : 0);
+    if (ForwardLinearAccess)
+      return m_argImpl.coeffRef(m_linear_offset.value() + index); 
+    else
+      return coeffRef(RowsAtCompileTime == 1 ? 0 : index, RowsAtCompileTime == 1 ? index : 0);
   }
  
   template<int LoadMode, typename PacketType>
@@ -1120,8 +1132,11 @@ struct unary_evaluator<Block<ArgType, BlockRows, BlockCols, InnerPanel>, IndexBa
   EIGEN_STRONG_INLINE
   PacketType packet(Index index) const 
   { 
-    return packet<LoadMode,PacketType>(RowsAtCompileTime == 1 ? 0 : index,
-                                       RowsAtCompileTime == 1 ? index : 0);
+    if (ForwardLinearAccess)
+      return m_argImpl.template packet<LoadMode,PacketType>(m_linear_offset.value() + index);
+    else
+      return packet<LoadMode,PacketType>(RowsAtCompileTime == 1 ? 0 : index,
+                                         RowsAtCompileTime == 1 ? index : 0);
   }
   
   template<int StoreMode, typename PacketType>
@@ -1135,15 +1150,19 @@ struct unary_evaluator<Block<ArgType, BlockRows, BlockCols, InnerPanel>, IndexBa
   EIGEN_STRONG_INLINE
   void writePacket(Index index, const PacketType& x) 
   {
-    return writePacket<StoreMode,PacketType>(RowsAtCompileTime == 1 ? 0 : index,
-                                             RowsAtCompileTime == 1 ? index : 0,
-                                             x);
+    if (ForwardLinearAccess)
+      return m_argImpl.template writePacket<StoreMode,PacketType>(m_linear_offset.value() + index, x);
+    else
+      return writePacket<StoreMode,PacketType>(RowsAtCompileTime == 1 ? 0 : index,
+                                              RowsAtCompileTime == 1 ? index : 0,
+                                              x);
   }
  
 protected:
   evaluator<ArgType> m_argImpl;
   const variable_if_dynamic<Index, (ArgType::RowsAtCompileTime == 1 && BlockRows==1) ? 0 : Dynamic> m_startRow;
   const variable_if_dynamic<Index, (ArgType::ColsAtCompileTime == 1 && BlockCols==1) ? 0 : Dynamic> m_startCol;
+  const variable_if_dynamic<Index, ForwardLinearAccess ? Dynamic : 0> m_linear_offset;
 };
 
 // TODO: This evaluator does not actually use the child evaluator; 
@@ -1305,64 +1324,6 @@ protected:
   const variable_if_dynamic<Index, ArgType::RowsAtCompileTime> m_rows;
   const variable_if_dynamic<Index, ArgType::ColsAtCompileTime> m_cols;
 };
-
-
-// -------------------- PartialReduxExpr --------------------
-
-template< typename ArgType, typename MemberOp, int Direction>
-struct evaluator<PartialReduxExpr<ArgType, MemberOp, Direction> >
-  : evaluator_base<PartialReduxExpr<ArgType, MemberOp, Direction> >
-{
-  typedef PartialReduxExpr<ArgType, MemberOp, Direction> XprType;
-  typedef typename internal::nested_eval<ArgType,1>::type ArgTypeNested;
-  typedef typename internal::remove_all<ArgTypeNested>::type ArgTypeNestedCleaned;
-  typedef typename ArgType::Scalar InputScalar;
-  typedef typename XprType::Scalar Scalar;
-  enum {
-    TraversalSize = Direction==int(Vertical) ? int(ArgType::RowsAtCompileTime) :  int(ArgType::ColsAtCompileTime)
-  };
-  typedef typename MemberOp::template Cost<InputScalar,int(TraversalSize)> CostOpType;
-  enum {
-    CoeffReadCost = TraversalSize==Dynamic ? HugeCost
-                  : TraversalSize * evaluator<ArgType>::CoeffReadCost + int(CostOpType::value),
-    
-    Flags = (traits<XprType>::Flags&RowMajorBit) | (evaluator<ArgType>::Flags&(HereditaryBits&(~RowMajorBit))) | LinearAccessBit,
-    
-    Alignment = 0 // FIXME this will need to be improved once PartialReduxExpr is vectorized
-  };
-
-  EIGEN_DEVICE_FUNC explicit evaluator(const XprType xpr)
-    : m_arg(xpr.nestedExpression()), m_functor(xpr.functor())
-  {
-    EIGEN_INTERNAL_CHECK_COST_VALUE(TraversalSize==Dynamic ? HugeCost : int(CostOpType::value));
-    EIGEN_INTERNAL_CHECK_COST_VALUE(CoeffReadCost);
-  }
-
-  typedef typename XprType::CoeffReturnType CoeffReturnType;
-
-  EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
-  const Scalar coeff(Index i, Index j) const
-  {
-    if (Direction==Vertical)
-      return m_functor(m_arg.col(j));
-    else
-      return m_functor(m_arg.row(i));
-  }
-
-  EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
-  const Scalar coeff(Index index) const
-  {
-    if (Direction==Vertical)
-      return m_functor(m_arg.col(index));
-    else
-      return m_functor(m_arg.row(index));
-  }
-
-protected:
-  typename internal::add_const_on_value_type<ArgTypeNested>::type m_arg;
-  const MemberOp m_functor;
-};
-
 
 // -------------------- MatrixWrapper and ArrayWrapper --------------------
 //

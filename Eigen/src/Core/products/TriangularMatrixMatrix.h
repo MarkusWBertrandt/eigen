@@ -151,7 +151,7 @@ EIGEN_DONT_INLINE void product_triangular_matrix_matrix<Scalar,Index,Mode,true,
       triangularBuffer.diagonal().setOnes();
 
     gebp_kernel<Scalar, Scalar, Index, ResMapper, Traits::mr, Traits::nr, ConjugateLhs, ConjugateRhs> gebp_kernel;
-    gemm_pack_lhs<Scalar, Index, LhsMapper, Traits::mr, Traits::LhsProgress, LhsStorageOrder> pack_lhs;
+    gemm_pack_lhs<Scalar, Index, LhsMapper, Traits::mr, Traits::LhsProgress, typename Traits::LhsPacket4Packing, LhsStorageOrder> pack_lhs;
     gemm_pack_rhs<Scalar, Index, RhsMapper, Traits::nr,RhsStorageOrder> pack_rhs;
 
     for(Index k2=IsLower ? depth : 0;
@@ -222,7 +222,7 @@ EIGEN_DONT_INLINE void product_triangular_matrix_matrix<Scalar,Index,Mode,true,
         for(Index i2=start; i2<end; i2+=mc)
         {
           const Index actual_mc = (std::min)(i2+mc,end)-i2;
-          gemm_pack_lhs<Scalar, Index, LhsMapper, Traits::mr,Traits::LhsProgress, LhsStorageOrder,false>()
+          gemm_pack_lhs<Scalar, Index, LhsMapper, Traits::mr,Traits::LhsProgress, typename Traits::LhsPacket4Packing, LhsStorageOrder,false>()
             (blockA, lhs.getSubMapper(i2, actual_k2), actual_kc, actual_mc);
 
           gebp_kernel(res.getSubMapper(i2, 0), blockA, blockB, actual_mc,
@@ -299,7 +299,7 @@ EIGEN_DONT_INLINE void product_triangular_matrix_matrix<Scalar,Index,Mode,false,
       triangularBuffer.diagonal().setOnes();
 
     gebp_kernel<Scalar, Scalar, Index, ResMapper, Traits::mr, Traits::nr, ConjugateLhs, ConjugateRhs> gebp_kernel;
-    gemm_pack_lhs<Scalar, Index, LhsMapper, Traits::mr, Traits::LhsProgress, LhsStorageOrder> pack_lhs;
+    gemm_pack_lhs<Scalar, Index, LhsMapper, Traits::mr, Traits::LhsProgress, typename Traits::LhsPacket4Packing, LhsStorageOrder> pack_lhs;
     gemm_pack_rhs<Scalar, Index, RhsMapper, Traits::nr,RhsStorageOrder> pack_rhs;
     gemm_pack_rhs<Scalar, Index, RhsMapper, Traits::nr,RhsStorageOrder,false,true> pack_rhs_panel;
 
@@ -400,7 +400,9 @@ struct triangular_product_impl<Mode,LhsIsTriangular,Lhs,false,Rhs,false>
 {
   template<typename Dest> static void run(Dest& dst, const Lhs &a_lhs, const Rhs &a_rhs, const typename Dest::Scalar& alpha)
   {
-    typedef typename Dest::Scalar     Scalar;
+    typedef typename Lhs::Scalar  LhsScalar;
+    typedef typename Rhs::Scalar  RhsScalar;
+    typedef typename Dest::Scalar Scalar;
     
     typedef internal::blas_traits<Lhs> LhsBlasTraits;
     typedef typename LhsBlasTraits::DirectLinearAccessType ActualLhsType;
@@ -412,8 +414,9 @@ struct triangular_product_impl<Mode,LhsIsTriangular,Lhs,false,Rhs,false>
     typename internal::add_const_on_value_type<ActualLhsType>::type lhs = LhsBlasTraits::extract(a_lhs);
     typename internal::add_const_on_value_type<ActualRhsType>::type rhs = RhsBlasTraits::extract(a_rhs);
 
-    Scalar actualAlpha = alpha * LhsBlasTraits::extractScalarFactor(a_lhs)
-                               * RhsBlasTraits::extractScalarFactor(a_rhs);
+    LhsScalar lhs_alpha = LhsBlasTraits::extractScalarFactor(a_lhs);
+    RhsScalar rhs_alpha = RhsBlasTraits::extractScalarFactor(a_rhs);
+    Scalar actualAlpha = alpha * lhs_alpha * rhs_alpha;
 
     typedef internal::gemm_blocking_space<(Dest::Flags&RowMajorBit) ? RowMajor : ColMajor,Scalar,Scalar,
               Lhs::MaxRowsAtCompileTime, Rhs::MaxColsAtCompileTime, Lhs::MaxColsAtCompileTime,4> BlockingType;
@@ -438,6 +441,21 @@ struct triangular_product_impl<Mode,LhsIsTriangular,Lhs,false,Rhs,false>
         &dst.coeffRef(0,0), dst.outerStride(),    // result info
         actualAlpha, blocking
       );
+
+    // Apply correction if the diagonal is unit and a scalar factor was nested:
+    if ((Mode&UnitDiag)==UnitDiag)
+    {
+      if (LhsIsTriangular && lhs_alpha!=LhsScalar(1))
+      {
+        Index diagSize = (std::min)(lhs.rows(),lhs.cols());
+        dst.topRows(diagSize) -= ((lhs_alpha-LhsScalar(1))*a_rhs).topRows(diagSize);
+      }
+      else if ((!LhsIsTriangular) && rhs_alpha!=RhsScalar(1))
+      {
+        Index diagSize = (std::min)(rhs.rows(),rhs.cols());
+        dst.leftCols(diagSize) -= (rhs_alpha-RhsScalar(1))*a_lhs.leftCols(diagSize);
+      }
+    }
   }
 };
 

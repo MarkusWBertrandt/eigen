@@ -239,45 +239,36 @@ void testMatrixType(const MatrixType& m)
   VERIFY_IS_APPROX( A(i,j), s1 );
 }
 
-void test_nullary()
+template<int>
+void bug79()
 {
-  CALL_SUBTEST_1( testMatrixType(Matrix2d()) );
-  CALL_SUBTEST_2( testMatrixType(MatrixXcf(internal::random<int>(1,300),internal::random<int>(1,300))) );
-  CALL_SUBTEST_3( testMatrixType(MatrixXf(internal::random<int>(1,300),internal::random<int>(1,300))) );
-  
-  for(int i = 0; i < g_repeat*10; i++) {
-    CALL_SUBTEST_4( testVectorType(VectorXd(internal::random<int>(1,30000))) );
-    CALL_SUBTEST_5( testVectorType(Vector4d()) );  // regression test for bug 232
-    CALL_SUBTEST_6( testVectorType(Vector3d()) );
-    CALL_SUBTEST_7( testVectorType(VectorXf(internal::random<int>(1,30000))) );
-    CALL_SUBTEST_8( testVectorType(Vector3f()) );
-    CALL_SUBTEST_8( testVectorType(Vector4f()) );
-    CALL_SUBTEST_8( testVectorType(Matrix<float,8,1>()) );
-    CALL_SUBTEST_8( testVectorType(Matrix<float,1,1>()) );
-
-    CALL_SUBTEST_9( testVectorType(VectorXi(internal::random<int>(1,10))) );
-    CALL_SUBTEST_9( testVectorType(VectorXi(internal::random<int>(9,300))) );
-    CALL_SUBTEST_9( testVectorType(Matrix<int,1,1>()) );
-  }
-
-#ifdef EIGEN_TEST_PART_6
   // Assignment of a RowVectorXd to a MatrixXd (regression test for bug #79).
   VERIFY( (MatrixXd(RowVectorXd::LinSpaced(3, 0, 1)) - RowVector3d(0, 0.5, 1)).norm() < std::numeric_limits<double>::epsilon() );
-#endif
+}
 
-#ifdef EIGEN_TEST_PART_9
+template<int>
+void bug1630()
+{
+  Array4d x4 = Array4d::LinSpaced(0.0, 1.0);
+  Array3d x3(Array4d::LinSpaced(0.0, 1.0).head(3));
+  VERIFY_IS_APPROX(x4.head(3), x3);
+}
+
+template<int>
+void nullary_overflow()
+{
   // Check possible overflow issue
-  {
-    int n = 60000;
-    ArrayXi a1(n), a2(n);
-    a1.setLinSpaced(n, 0, n-1);
-    for(int i=0; i<n; ++i)
-      a2(i) = i;
-    VERIFY_IS_APPROX(a1,a2);
-  }
-#endif
+  int n = 60000;
+  ArrayXi a1(n), a2(n);
+  a1.setLinSpaced(n, 0, n-1);
+  for(int i=0; i<n; ++i)
+    a2(i) = i;
+  VERIFY_IS_APPROX(a1,a2);
+}
 
-#ifdef EIGEN_TEST_PART_10
+template<int>
+void nullary_internal_logic()
+{
   // check some internal logic
   VERIFY((  internal::has_nullary_operator<internal::scalar_constant_op<double> >::value ));
   VERIFY(( !internal::has_unary_operator<internal::scalar_constant_op<double> >::value ));
@@ -289,10 +280,10 @@ void test_nullary()
   VERIFY((  internal::has_binary_operator<internal::scalar_identity_op<double> >::value ));
   VERIFY(( !internal::functor_has_linear_access<internal::scalar_identity_op<double> >::ret ));
 
-  VERIFY(( !internal::has_nullary_operator<internal::linspaced_op<float,float> >::value ));
-  VERIFY((  internal::has_unary_operator<internal::linspaced_op<float,float> >::value ));
-  VERIFY(( !internal::has_binary_operator<internal::linspaced_op<float,float> >::value ));
-  VERIFY((  internal::functor_has_linear_access<internal::linspaced_op<float,float> >::ret ));
+  VERIFY(( !internal::has_nullary_operator<internal::linspaced_op<float> >::value ));
+  VERIFY((  internal::has_unary_operator<internal::linspaced_op<float> >::value ));
+  VERIFY(( !internal::has_binary_operator<internal::linspaced_op<float> >::value ));
+  VERIFY((  internal::functor_has_linear_access<internal::linspaced_op<float> >::ret ));
 
   // Regression unit test for a weird MSVC bug.
   // Search "nullary_wrapper_workaround_msvc" in CoreEvaluators.h for the details.
@@ -313,10 +304,36 @@ void test_nullary()
     VERIFY(( !internal::has_binary_operator<internal::scalar_constant_op<float> >::value ));
     VERIFY((  internal::functor_has_linear_access<internal::scalar_constant_op<float> >::ret ));
 
-    VERIFY(( !internal::has_nullary_operator<internal::linspaced_op<int,int> >::value ));
-    VERIFY((  internal::has_unary_operator<internal::linspaced_op<int,int> >::value ));
-    VERIFY(( !internal::has_binary_operator<internal::linspaced_op<int,int> >::value ));
-    VERIFY((  internal::functor_has_linear_access<internal::linspaced_op<int,int> >::ret ));
+    VERIFY(( !internal::has_nullary_operator<internal::linspaced_op<int> >::value ));
+    VERIFY((  internal::has_unary_operator<internal::linspaced_op<int> >::value ));
+    VERIFY(( !internal::has_binary_operator<internal::linspaced_op<int> >::value ));
+    VERIFY((  internal::functor_has_linear_access<internal::linspaced_op<int> >::ret ));
   }
-#endif
+}
+
+EIGEN_DECLARE_TEST(nullary)
+{
+  CALL_SUBTEST_1( testMatrixType(Matrix2d()) );
+  CALL_SUBTEST_2( testMatrixType(MatrixXcf(internal::random<int>(1,300),internal::random<int>(1,300))) );
+  CALL_SUBTEST_3( testMatrixType(MatrixXf(internal::random<int>(1,300),internal::random<int>(1,300))) );
+  
+  for(int i = 0; i < g_repeat*10; i++) {
+    CALL_SUBTEST_4( testVectorType(VectorXd(internal::random<int>(1,30000))) );
+    CALL_SUBTEST_5( testVectorType(Vector4d()) );  // regression test for bug 232
+    CALL_SUBTEST_6( testVectorType(Vector3d()) );
+    CALL_SUBTEST_7( testVectorType(VectorXf(internal::random<int>(1,30000))) );
+    CALL_SUBTEST_8( testVectorType(Vector3f()) );
+    CALL_SUBTEST_8( testVectorType(Vector4f()) );
+    CALL_SUBTEST_8( testVectorType(Matrix<float,8,1>()) );
+    CALL_SUBTEST_8( testVectorType(Matrix<float,1,1>()) );
+
+    CALL_SUBTEST_9( testVectorType(VectorXi(internal::random<int>(1,10))) );
+    CALL_SUBTEST_9( testVectorType(VectorXi(internal::random<int>(9,300))) );
+    CALL_SUBTEST_9( testVectorType(Matrix<int,1,1>()) );
+  }
+
+  CALL_SUBTEST_6( bug79<0>() );
+  CALL_SUBTEST_6( bug1630<0>() );
+  CALL_SUBTEST_9( nullary_overflow<0>() );
+  CALL_SUBTEST_10( nullary_internal_logic<0>() );
 }
