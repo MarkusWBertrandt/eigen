@@ -13,6 +13,7 @@
 
 template<typename MatrixType> void basicStuff(const MatrixType& m)
 {
+  typedef typename MatrixType::Index Index;
   typedef typename MatrixType::Scalar Scalar;
   typedef Matrix<Scalar, MatrixType::RowsAtCompileTime, 1> VectorType;
   typedef Matrix<Scalar, MatrixType::RowsAtCompileTime, MatrixType::RowsAtCompileTime> SquareMatrixType;
@@ -123,22 +124,22 @@ template<typename MatrixType> void basicStuff(const MatrixType& m)
   
   // check automatic transposition
   sm2.setZero();
-  for(Index i=0;i<rows;++i)
+  for(typename MatrixType::Index i=0;i<rows;++i)
     sm2.col(i) = sm1.row(i);
   VERIFY_IS_APPROX(sm2,sm1.transpose());
   
   sm2.setZero();
-  for(Index i=0;i<rows;++i)
+  for(typename MatrixType::Index i=0;i<rows;++i)
     sm2.col(i).noalias() = sm1.row(i);
   VERIFY_IS_APPROX(sm2,sm1.transpose());
   
   sm2.setZero();
-  for(Index i=0;i<rows;++i)
+  for(typename MatrixType::Index i=0;i<rows;++i)
     sm2.col(i).noalias() += sm1.row(i);
   VERIFY_IS_APPROX(sm2,sm1.transpose());
   
   sm2.setZero();
-  for(Index i=0;i<rows;++i)
+  for(typename MatrixType::Index i=0;i<rows;++i)
     sm2.col(i).noalias() -= sm1.row(i);
   VERIFY_IS_APPROX(sm2,-sm1.transpose());
   
@@ -159,6 +160,7 @@ template<typename MatrixType> void basicStuff(const MatrixType& m)
 
 template<typename MatrixType> void basicStuffComplex(const MatrixType& m)
 {
+  typedef typename MatrixType::Index Index;
   typedef typename MatrixType::Scalar Scalar;
   typedef typename NumTraits<Scalar>::Real RealScalar;
   typedef Matrix<RealScalar, MatrixType::RowsAtCompileTime, MatrixType::ColsAtCompileTime> RealMatrixType;
@@ -194,7 +196,7 @@ template<typename MatrixType> void basicStuffComplex(const MatrixType& m)
   VERIFY(!static_cast<const MatrixType&>(cm).imag().isZero());
 }
 
-template<int>
+#ifdef EIGEN_TEST_PART_2
 void casting()
 {
   Matrix4f m = Matrix4f::Random(), m2;
@@ -203,6 +205,7 @@ void casting()
   m2 = m.cast<float>(); // check the specialization when NewType == Type
   VERIFY(m.isApprox(m2));
 }
+#endif
 
 template <typename Scalar>
 void fixedSizeMatrixConstruction()
@@ -267,7 +270,7 @@ void fixedSizeMatrixConstruction()
   }
 }
 
-EIGEN_DECLARE_TEST(basicstuff)
+void test_basicstuff()
 {
   for(int i = 0; i < g_repeat; i++) {
     CALL_SUBTEST_1( basicStuff(Matrix<float, 1, 1>()) );
@@ -289,5 +292,5 @@ EIGEN_DECLARE_TEST(basicstuff)
   CALL_SUBTEST_1(fixedSizeMatrixConstruction<long int>());
   CALL_SUBTEST_1(fixedSizeMatrixConstruction<std::ptrdiff_t>());
 
-  CALL_SUBTEST_2(casting<0>());
+  CALL_SUBTEST_2(casting());
 }

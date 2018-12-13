@@ -81,7 +81,7 @@ template<typename VectorType> void zeroSizedVector()
   }
 }
 
-EIGEN_DECLARE_TEST(zerosized)
+void test_zerosized()
 {
   zeroSizedMatrix<Matrix2d>();
   zeroSizedMatrix<Matrix3i>();

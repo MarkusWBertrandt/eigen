@@ -108,13 +108,11 @@ struct TensorEvaluator<const TensorReverseOp<ReverseDimensions, ArgType>, Device
   typedef typename XprType::Scalar Scalar;
   typedef typename XprType::CoeffReturnType CoeffReturnType;
   typedef typename PacketType<CoeffReturnType, Device>::type PacketReturnType;
-  static const int PacketSize = PacketType<CoeffReturnType, Device>::size;
+  static const int PacketSize = internal::unpacket_traits<PacketReturnType>::size;
 
   enum {
     IsAligned = false,
     PacketAccess = TensorEvaluator<ArgType, Device>::PacketAccess,
-    BlockAccess = false,
-    PreferBlockAccess = false,
     Layout = TensorEvaluator<ArgType, Device>::Layout,
     CoordAccess = false,  // to be implemented
     RawAccess = false
@@ -255,8 +253,6 @@ struct TensorEvaluator<TensorReverseOp<ReverseDimensions, ArgType>, Device>
   enum {
     IsAligned = false,
     PacketAccess = TensorEvaluator<ArgType, Device>::PacketAccess,
-    BlockAccess = false,
-    PreferBlockAccess = false,
     Layout = TensorEvaluator<ArgType, Device>::Layout,
     CoordAccess = false,  // to be implemented
     RawAccess = false
@@ -268,7 +264,7 @@ struct TensorEvaluator<TensorReverseOp<ReverseDimensions, ArgType>, Device>
   typedef typename XprType::Scalar Scalar;
   typedef typename XprType::CoeffReturnType CoeffReturnType;
   typedef typename PacketType<CoeffReturnType, Device>::type PacketReturnType;
-  static const int PacketSize = PacketType<CoeffReturnType, Device>::size;
+  static const int PacketSize = internal::unpacket_traits<PacketReturnType>::size;
 
   EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE
   const Dimensions& dimensions() const { return this->m_dimensions; }

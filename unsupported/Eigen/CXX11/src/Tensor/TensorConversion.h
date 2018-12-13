@@ -190,13 +190,11 @@ struct TensorEvaluator<const TensorConversionOp<TargetType, ArgType>, Device>
   typedef typename internal::remove_all<typename internal::traits<ArgType>::Scalar>::type SrcType;
   typedef typename PacketType<CoeffReturnType, Device>::type PacketReturnType;
   typedef typename PacketType<SrcType, Device>::type PacketSourceType;
-  static const int PacketSize = PacketType<CoeffReturnType, Device>::size;
+  static const int PacketSize = internal::unpacket_traits<PacketReturnType>::size;
 
   enum {
     IsAligned = false,
     PacketAccess = true,
-    BlockAccess = false,
-    PreferBlockAccess = false,
     Layout = TensorEvaluator<ArgType, Device>::Layout,
     RawAccess = false
   };

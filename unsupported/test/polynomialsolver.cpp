@@ -30,6 +30,7 @@ struct increment_if_fixed_size
 template<int Deg, typename POLYNOMIAL, typename SOLVER>
 bool aux_evalSolver( const POLYNOMIAL& pols, SOLVER& psolve )
 {
+  typedef typename POLYNOMIAL::Index Index;
   typedef typename POLYNOMIAL::Scalar Scalar;
   typedef typename POLYNOMIAL::RealScalar RealScalar;
 
@@ -190,7 +191,7 @@ void polynomialsolver(int deg)
       realRoots );
 }
 
-EIGEN_DECLARE_TEST(polynomialsolver)
+void test_polynomialsolver()
 {
   for(int i = 0; i < g_repeat; i++)
   {

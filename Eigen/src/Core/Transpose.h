@@ -79,7 +79,6 @@ template<typename MatrixType> class Transpose
     nestedExpression() { return m_matrix; }
 
     /** \internal */
-    EIGEN_DEVICE_FUNC
     void resize(Index nrows, Index ncols) {
       m_matrix.resize(ncols,nrows);
     }

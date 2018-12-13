@@ -12,6 +12,8 @@
 
 template<typename MatrixType> void qr(const MatrixType& m)
 {
+  typedef typename MatrixType::Index Index;
+
   Index rows = m.rows();
   Index cols = m.cols();
 
@@ -83,7 +85,7 @@ template<typename MatrixType> void qr_invertible()
   qr.compute(m1);
   VERIFY_IS_APPROX(log(absdet), qr.logAbsDeterminant());
   // This test is tricky if the determinant becomes too small.
-  // Since we generate random numbers with magnitude range [0,1], the average determinant is 0.5^size
+  // Since we generate random numbers with magnitude rrange [0,1], the average determinant is 0.5^size
   VERIFY_IS_MUCH_SMALLER_THAN( abs(absdet-qr.absDeterminant()), numext::maxi(RealScalar(pow(0.5,size)),numext::maxi<RealScalar>(abs(absdet),abs(qr.absDeterminant()))) );
   
 }
@@ -100,7 +102,7 @@ template<typename MatrixType> void qr_verify_assert()
   VERIFY_RAISES_ASSERT(qr.logAbsDeterminant())
 }
 
-EIGEN_DECLARE_TEST(qr)
+void test_qr()
 {
   for(int i = 0; i < g_repeat; i++) {
    CALL_SUBTEST_1( qr(MatrixXf(internal::random<int>(1,EIGEN_TEST_MAX_SIZE),internal::random<int>(1,EIGEN_TEST_MAX_SIZE))) );

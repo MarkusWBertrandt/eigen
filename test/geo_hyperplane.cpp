@@ -19,6 +19,7 @@ template<typename HyperplaneType> void hyperplane(const HyperplaneType& _plane)
      Hyperplane.h
   */
   using std::abs;
+  typedef typename HyperplaneType::Index Index;
   const Index dim = _plane.dim();
   enum { Options = HyperplaneType::Options };
   typedef typename HyperplaneType::Scalar Scalar;
@@ -180,7 +181,7 @@ template<typename Scalar> void hyperplane_alignment()
 }
 
 
-EIGEN_DECLARE_TEST(geo_hyperplane)
+void test_geo_hyperplane()
 {
   for(int i = 0; i < g_repeat; i++) {
     CALL_SUBTEST_1( hyperplane(Hyperplane<float,2>()) );

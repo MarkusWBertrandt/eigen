@@ -339,8 +339,6 @@ enum SideType {
   OnTheRight = 2  
 };
 
-
-
 /* the following used to be written as:
  *
  *   struct NoChange_t {};
@@ -470,7 +468,6 @@ namespace Architecture
     AltiVec = 0x2,
     VSX = 0x3,
     NEON = 0x4,
-    MSA = 0x5,
 #if defined EIGEN_VECTORIZE_SSE
     Target = SSE
 #elif defined EIGEN_VECTORIZE_ALTIVEC
@@ -479,8 +476,6 @@ namespace Architecture
     Target = VSX
 #elif defined EIGEN_VECTORIZE_NEON
     Target = NEON
-#elif defined EIGEN_VECTORIZE_MSA
-    Target = MSA
 #else
     Target = Generic
 #endif

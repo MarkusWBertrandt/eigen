@@ -228,37 +228,7 @@ void bug_1311()
   VERIFY_IS_APPROX(res, A*b);
 }
 
-template<int>
-void product_small_regressions()
-{
-  {
-    // test compilation of (outer_product) * vector
-    Vector3f v = Vector3f::Random();
-    VERIFY_IS_APPROX( (v * v.transpose()) * v, (v * v.transpose()).eval() * v);
-  }
-  
-  {
-    // regression test for pull-request #93
-    Eigen::Matrix<double, 1, 1> A;  A.setRandom();
-    Eigen::Matrix<double, 18, 1> B; B.setRandom();
-    Eigen::Matrix<double, 1, 18> C; C.setRandom();
-    VERIFY_IS_APPROX(B * A.inverse(), B * A.inverse()[0]);
-    VERIFY_IS_APPROX(A.inverse() * C, A.inverse()[0] * C);
-  }
-
-  {
-    Eigen::Matrix<double, 10, 10> A, B, C;
-    A.setRandom();
-    C = A;
-    for(int k=0; k<79; ++k)
-      C = C * A;
-    B.noalias() = (((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A)) * ((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A)))
-                * (((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A)) * ((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A)));
-    VERIFY_IS_APPROX(B,C);
-  }
-}
-
-EIGEN_DECLARE_TEST(product_small)
+void test_product_small()
 {
   for(int i = 0; i < g_repeat; i++) {
     CALL_SUBTEST_1( product(Matrix<float, 3, 2>()) );
@@ -293,5 +263,31 @@ EIGEN_DECLARE_TEST(product_small)
     CALL_SUBTEST_6( bug_1311<5>() );
   }
 
-  CALL_SUBTEST_6( product_small_regressions<0>() );
+#ifdef EIGEN_TEST_PART_6
+  {
+    // test compilation of (outer_product) * vector
+    Vector3f v = Vector3f::Random();
+    VERIFY_IS_APPROX( (v * v.transpose()) * v, (v * v.transpose()).eval() * v);
+  }
+  
+  {
+    // regression test for pull-request #93
+    Eigen::Matrix<double, 1, 1> A;  A.setRandom();
+    Eigen::Matrix<double, 18, 1> B; B.setRandom();
+    Eigen::Matrix<double, 1, 18> C; C.setRandom();
+    VERIFY_IS_APPROX(B * A.inverse(), B * A.inverse()[0]);
+    VERIFY_IS_APPROX(A.inverse() * C, A.inverse()[0] * C);
+  }
+
+  {
+    Eigen::Matrix<double, 10, 10> A, B, C;
+    A.setRandom();
+    C = A;
+    for(int k=0; k<79; ++k)
+      C = C * A;
+    B.noalias() = (((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A)) * ((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A)))
+                * (((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A)) * ((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A))*((A*A)*(A*A)));
+    VERIFY_IS_APPROX(B,C);
+  }
+#endif
 }

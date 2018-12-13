@@ -402,7 +402,7 @@ template<typename _MatrixType> class ColPivHouseholderQR
       */
     RealScalar maxPivot() const { return m_maxpivot; }
 
-    /** \brief Reports whether the QR factorization was successful.
+    /** \brief Reports whether the QR factorization was succesful.
       *
       * \note This function always returns \c Success. It is provided for compatibility
       * with other factorization routines.
@@ -595,7 +595,11 @@ void ColPivHouseholderQR<_MatrixType>::_solve_impl(const RhsType &rhs, DstType &
 
   typename RhsType::PlainObject c(rhs);
 
-  c.applyOnTheLeft(householderQ().setLength(nonzero_pivots).adjoint() );
+  // Note that the matrix Q = H_0^* H_1^*... so its inverse is Q^* = (H_0 H_1 ...)^T
+  c.applyOnTheLeft(householderSequence(m_qr, m_hCoeffs)
+                    .setLength(nonzero_pivots)
+                    .transpose()
+    );
 
   m_qr.topLeftCorner(nonzero_pivots, nonzero_pivots)
       .template triangularView<Upper>()
