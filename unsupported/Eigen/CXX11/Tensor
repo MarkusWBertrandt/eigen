@@ -11,6 +11,8 @@
 //#ifndef EIGEN_CXX11_TENSOR_MODULE
 //#define EIGEN_CXX11_TENSOR_MODULE
 
+#pragma once
+
 #include "../../../Eigen/Core"
 
 #if defined(EIGEN_USE_SYCL)
