@@ -19,8 +19,8 @@ template<typename MatrixType> void triangular_square(const MatrixType& m)
 
   RealScalar largerEps = 10*test_precision<RealScalar>();
 
-  Index rows = m.rows();
-  Index cols = m.cols();
+  typename MatrixType::Index rows = m.rows();
+  typename MatrixType::Index cols = m.cols();
 
   MatrixType m1 = MatrixType::Random(rows, cols),
              m2 = MatrixType::Random(rows, cols),
@@ -68,7 +68,7 @@ template<typename MatrixType> void triangular_square(const MatrixType& m)
     while (numext::abs2(m1(i,i))<RealScalar(1e-1)) m1(i,i) = internal::random<Scalar>();
 
   Transpose<MatrixType> trm4(m4);
-  // test back and forward substitution with a vector as the rhs
+  // test back and forward subsitution with a vector as the rhs
   m3 = m1.template triangularView<Upper>();
   VERIFY(v2.isApprox(m3.adjoint() * (m1.adjoint().template triangularView<Lower>().solve(v2)), largerEps));
   m3 = m1.template triangularView<Lower>();
@@ -134,6 +134,7 @@ template<typename MatrixType> void triangular_square(const MatrixType& m)
 
 template<typename MatrixType> void triangular_rect(const MatrixType& m)
 {
+  typedef const typename MatrixType::Index Index;
   typedef typename MatrixType::Scalar Scalar;
   typedef typename NumTraits<Scalar>::Real RealScalar;
   enum { Rows =  MatrixType::RowsAtCompileTime, Cols =  MatrixType::ColsAtCompileTime };
@@ -220,7 +221,7 @@ void bug_159()
   EIGEN_UNUSED_VARIABLE(m)
 }
 
-EIGEN_DECLARE_TEST(triangular)
+void test_triangular()
 {
   int maxsize = (std::min)(EIGEN_TEST_MAX_SIZE,20);
   for(int i = 0; i < g_repeat ; i++)

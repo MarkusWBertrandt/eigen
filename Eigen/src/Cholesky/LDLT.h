@@ -247,7 +247,7 @@ template<typename _MatrixType, int _UpLo> class LDLT
 
     /** \brief Reports whether previous computation was successful.
       *
-      * \returns \c Success if computation was successful,
+      * \returns \c Success if computation was succesful,
       *          \c NumericalIssue if the factorization failed because of a zero pivot.
       */
     ComputationInfo info() const
@@ -304,8 +304,7 @@ template<> struct ldlt_inplace<Lower>
     if (size <= 1)
     {
       transpositions.setIdentity();
-      if(size==0) sign = ZeroSign;
-      else if (numext::real(mat.coeff(0,0)) > static_cast<RealScalar>(0) ) sign = PositiveSemiDef;
+      if (numext::real(mat.coeff(0,0)) > static_cast<RealScalar>(0) ) sign = PositiveSemiDef;
       else if (numext::real(mat.coeff(0,0)) < static_cast<RealScalar>(0)) sign = NegativeSemiDef;
       else sign = ZeroSign;
       return true;
@@ -570,14 +569,13 @@ void LDLT<_MatrixType,_UpLo>::_solve_impl(const RhsType &rhs, DstType &dst) cons
   // more precisely, use pseudo-inverse of D (see bug 241)
   using std::abs;
   const typename Diagonal<const MatrixType>::RealReturnType vecD(vectorD());
-  // In some previous versions, tolerance was set to the max of 1/highest (or rather numeric_limits::min())
-  // and the maximal diagonal entry * epsilon as motivated by LAPACK's xGELSS:
+  // In some previous versions, tolerance was set to the max of 1/highest and the maximal diagonal entry * epsilon
+  // as motivated by LAPACK's xGELSS:
   // RealScalar tolerance = numext::maxi(vecD.array().abs().maxCoeff() * NumTraits<RealScalar>::epsilon(),RealScalar(1) / NumTraits<RealScalar>::highest());
   // However, LDLT is not rank revealing, and so adjusting the tolerance wrt to the highest
   // diagonal element is not well justified and leads to numerical issues in some cases.
   // Moreover, Lapack's xSYTRS routines use 0 for the tolerance.
-  // Using numeric_limits::min() gives us more robustness to denormals.
-  RealScalar tolerance = (std::numeric_limits<RealScalar>::min)();
+  RealScalar tolerance = RealScalar(1) / NumTraits<RealScalar>::highest();
 
   for (Index i = 0; i < vecD.size(); ++i)
   {

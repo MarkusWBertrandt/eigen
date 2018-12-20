@@ -16,10 +16,10 @@ namespace internal {
 namespace {
 
 EIGEN_DEVICE_FUNC uint64_t get_random_seed() {
-#if defined(EIGEN_GPU_COMPILE_PHASE)
+#ifdef EIGEN_CUDA_ARCH
   // We don't support 3d kernels since we currently only use 1 and
   // 2d kernels.
-  gpu_assert(threadIdx.z == 0);
+  assert(threadIdx.z == 0);
   return clock64() +
       blockIdx.x * blockDim.x + threadIdx.x +
       gridDim.x * blockDim.x * (blockIdx.y * blockDim.y + threadIdx.y);

@@ -19,28 +19,19 @@ macro(ei_add_test_internal testname testname_with_suffix)
   endif()
 
   if(EIGEN_ADD_TEST_FILENAME_EXTENSION STREQUAL cu)
-    if(EIGEN_TEST_HIP)
-      hip_reset_flags()
-      hip_add_executable(${targetname} ${filename} HIPCC_OPTIONS "-DEIGEN_USE_HIP ${ARGV2}")
-    elseif(EIGEN_TEST_CUDA_CLANG)
+    if(EIGEN_TEST_CUDA_CLANG)
       set_source_files_properties(${filename} PROPERTIES LANGUAGE CXX)
-      
-      if(CUDA_64_BIT_DEVICE_CODE AND (EXISTS "${CUDA_TOOLKIT_ROOT_DIR}/lib64"))
+      if(CUDA_64_BIT_DEVICE_CODE)
         link_directories("${CUDA_TOOLKIT_ROOT_DIR}/lib64")
       else()
         link_directories("${CUDA_TOOLKIT_ROOT_DIR}/lib")
       endif()
-
       if (${ARGC} GREATER 2)
         add_executable(${targetname} ${filename})
       else()
         add_executable(${targetname} ${filename} OPTIONS ${ARGV2})
       endif()
-      set(CUDA_CLANG_LINK_LIBRARIES "cudart_static" "cuda" "dl" "pthread")
-      if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-      set(CUDA_CLANG_LINK_LIBRARIES ${CUDA_CLANG_LINK_LIBRARIES} "rt")
-      endif()
-      target_link_libraries(${targetname} ${CUDA_CLANG_LINK_LIBRARIES})
+      target_link_libraries(${targetname} "cudart_static" "cuda" "dl" "rt" "pthread")
     else()
       if (${ARGC} GREATER 2)
         cuda_add_executable(${targetname} ${filename} OPTIONS ${ARGV2})
@@ -67,6 +58,8 @@ macro(ei_add_test_internal testname testname_with_suffix)
   endif(EIGEN_NO_ASSERTION_CHECKING)
 
   ei_add_target_property(${targetname} COMPILE_FLAGS "-DEIGEN_TEST_MAX_SIZE=${EIGEN_TEST_MAX_SIZE}")
+
+  ei_add_target_property(${targetname} COMPILE_FLAGS "-DEIGEN_TEST_FUNC=${testname}")
 
   if(MSVC)
     ei_add_target_property(${targetname} COMPILE_FLAGS "/bigobj")
@@ -106,7 +99,7 @@ macro(ei_add_test_internal testname testname_with_suffix)
 
   add_test(${testname_with_suffix} "${targetname}")
 
-  # Specify target and test labels according to EIGEN_CURRENT_SUBPROJECT
+  # Specify target and test labels accoirding to EIGEN_CURRENT_SUBPROJECT
   get_property(current_subproject GLOBAL PROPERTY EIGEN_CURRENT_SUBPROJECT)
   if ((current_subproject) AND (NOT (current_subproject STREQUAL "")))
     set_property(TARGET ${targetname} PROPERTY LABELS "Build${current_subproject}")
@@ -167,6 +160,8 @@ macro(ei_add_test_internal_sycl testname testname_with_suffix)
   endif(EIGEN_NO_ASSERTION_CHECKING)
 
   ei_add_target_property(${targetname} COMPILE_FLAGS "-DEIGEN_TEST_MAX_SIZE=${EIGEN_TEST_MAX_SIZE}")
+
+  ei_add_target_property(${targetname} COMPILE_FLAGS "-DEIGEN_TEST_FUNC=${testname}")
 
   if(MSVC AND NOT EIGEN_SPLIT_LARGE_TESTS)
     ei_add_target_property(${targetname} COMPILE_FLAGS "/bigobj")
@@ -252,7 +247,7 @@ endmacro(ei_add_test_internal_sycl)
 #
 # If EIGEN_SPLIT_LARGE_TESTS is ON, the test is split into multiple executables
 #   test_<testname>_<N>
-# where N runs from 1 to the greatest occurrence found in the source file. Each of these
+# where N runs from 1 to the greatest occurence found in the source file. Each of these
 # executables is built passing -DEIGEN_TEST_PART_N. This allows to split large tests
 # into smaller executables.
 #
@@ -272,28 +267,26 @@ macro(ei_add_test testname)
   endif()
 
   file(READ "${filename}" test_source)
+  set(parts 0)
   string(REGEX MATCHALL "CALL_SUBTEST_[0-9]+|EIGEN_TEST_PART_[0-9]+|EIGEN_SUFFIXES(;[0-9]+)+"
-         occurrences "${test_source}")
-  string(REGEX REPLACE "CALL_SUBTEST_|EIGEN_TEST_PART_|EIGEN_SUFFIXES" "" suffixes "${occurrences}")
+         occurences "${test_source}")
+  string(REGEX REPLACE "CALL_SUBTEST_|EIGEN_TEST_PART_|EIGEN_SUFFIXES" "" suffixes "${occurences}")
   list(REMOVE_DUPLICATES suffixes)
-  set(explicit_suffixes "")
-  if( (NOT EIGEN_SPLIT_LARGE_TESTS) AND suffixes)
-    # Check whether we have EIGEN_TEST_PART_* statements, in which case we likely must enforce splitting.
-    # For instance, indexed_view activate a different c++ version for each part.
-    string(REGEX MATCHALL "EIGEN_TEST_PART_[0-9]+" occurrences "${test_source}")
-    string(REGEX REPLACE "EIGEN_TEST_PART_" "" explicit_suffixes "${occurrences}")
-    list(REMOVE_DUPLICATES explicit_suffixes)
-  endif()
-  if( (EIGEN_SPLIT_LARGE_TESTS AND suffixes) OR explicit_suffixes)
+  if(EIGEN_SPLIT_LARGE_TESTS AND suffixes)
     add_custom_target(${testname})
     foreach(suffix ${suffixes})
       ei_add_test_internal(${testname} ${testname}_${suffix}
         "${ARGV1} -DEIGEN_TEST_PART_${suffix}=1" "${ARGV2}")
       add_dependencies(${testname} ${testname}_${suffix})
     endforeach(suffix)
-  else()
-    ei_add_test_internal(${testname} ${testname} "${ARGV1} -DEIGEN_TEST_PART_ALL=1" "${ARGV2}")
-  endif()
+  else(EIGEN_SPLIT_LARGE_TESTS AND suffixes)
+    set(symbols_to_enable_all_parts "")
+    foreach(suffix ${suffixes})
+      set(symbols_to_enable_all_parts
+        "${symbols_to_enable_all_parts} -DEIGEN_TEST_PART_${suffix}=1")
+    endforeach(suffix)
+    ei_add_test_internal(${testname} ${testname} "${ARGV1} ${symbols_to_enable_all_parts}" "${ARGV2}")
+  endif(EIGEN_SPLIT_LARGE_TESTS AND suffixes)
 endmacro(ei_add_test)
 
 macro(ei_add_test_sycl testname)
@@ -310,8 +303,8 @@ macro(ei_add_test_sycl testname)
   file(READ "${filename}" test_source)
   set(parts 0)
   string(REGEX MATCHALL "CALL_SUBTEST_[0-9]+|EIGEN_TEST_PART_[0-9]+|EIGEN_SUFFIXES(;[0-9]+)+"
-         occurrences "${test_source}")
-  string(REGEX REPLACE "CALL_SUBTEST_|EIGEN_TEST_PART_|EIGEN_SUFFIXES" "" suffixes "${occurrences}")
+         occurences "${test_source}")
+  string(REGEX REPLACE "CALL_SUBTEST_|EIGEN_TEST_PART_|EIGEN_SUFFIXES" "" suffixes "${occurences}")
   list(REMOVE_DUPLICATES suffixes)
   if(EIGEN_SPLIT_LARGE_TESTS AND suffixes)
     add_custom_target(${testname})
@@ -334,32 +327,37 @@ endmacro(ei_add_test_sycl)
 # note that the test runner for these is CMake itself, when passed -DEIGEN_FAILTEST=ON
 # so here we're just running CMake commands immediately, we're not adding any targets.
 macro(ei_add_failtest testname)
+  get_property(EIGEN_FAILTEST_FAILURE_COUNT GLOBAL PROPERTY EIGEN_FAILTEST_FAILURE_COUNT)
+  get_property(EIGEN_FAILTEST_COUNT GLOBAL PROPERTY EIGEN_FAILTEST_COUNT)
 
-  set(test_target_ok ${testname}_ok)
-  set(test_target_ko ${testname}_ko)
+  message(STATUS "Checking failtest: ${testname}")
+  set(filename "${testname}.cpp")
+  file(READ "${filename}" test_source)
 
-  # Add executables
-  add_executable(${test_target_ok} ${testname}.cpp)
-  add_executable(${test_target_ko} ${testname}.cpp)
+  try_compile(succeeds_when_it_should_fail
+              "${CMAKE_CURRENT_BINARY_DIR}"
+              "${CMAKE_CURRENT_SOURCE_DIR}/${filename}"
+              COMPILE_DEFINITIONS "-DEIGEN_SHOULD_FAIL_TO_BUILD")
+  if (succeeds_when_it_should_fail)
+    message(STATUS "FAILED: ${testname} build succeeded when it should have failed")
+  endif()
 
-  # Remove them from the normal build process
-  set_target_properties(${test_target_ok} ${test_target_ko} PROPERTIES
-                        EXCLUDE_FROM_ALL TRUE
-                        EXCLUDE_FROM_DEFAULT_BUILD TRUE)
+  try_compile(succeeds_when_it_should_succeed
+              "${CMAKE_CURRENT_BINARY_DIR}"
+              "${CMAKE_CURRENT_SOURCE_DIR}/${filename}"
+              COMPILE_DEFINITIONS)
+  if (NOT succeeds_when_it_should_succeed)
+    message(STATUS "FAILED: ${testname} build failed when it should have succeeded")
+  endif()
 
-  # Configure the failing test
-  target_compile_definitions(${test_target_ko} PRIVATE EIGEN_SHOULD_FAIL_TO_BUILD)
+  if (succeeds_when_it_should_fail OR NOT succeeds_when_it_should_succeed)
+    math(EXPR EIGEN_FAILTEST_FAILURE_COUNT ${EIGEN_FAILTEST_FAILURE_COUNT}+1)
+  endif()
 
-  # Add the tests to ctest.
-  add_test(NAME ${test_target_ok}
-          COMMAND ${CMAKE_COMMAND} --build . --target ${test_target_ok} --config $<CONFIGURATION>
-          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-  add_test(NAME ${test_target_ko}
-          COMMAND ${CMAKE_COMMAND} --build . --target ${test_target_ko} --config $<CONFIGURATION>
-          WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  math(EXPR EIGEN_FAILTEST_COUNT ${EIGEN_FAILTEST_COUNT}+1)
 
-  # Expect the second test to fail
-  set_tests_properties(${test_target_ko} PROPERTIES WILL_FAIL TRUE)
+  set_property(GLOBAL PROPERTY EIGEN_FAILTEST_FAILURE_COUNT ${EIGEN_FAILTEST_FAILURE_COUNT})
+  set_property(GLOBAL PROPERTY EIGEN_FAILTEST_COUNT ${EIGEN_FAILTEST_COUNT})
 endmacro(ei_add_failtest)
 
 # print a summary of the different options
@@ -451,12 +449,6 @@ macro(ei_testing_print_summary)
       message(STATUS "VSX:               Using architecture defaults")
     endif()
 
-    if(EIGEN_TEST_MSA)
-      message(STATUS "MIPS MSA:          ON")
-    else()
-      message(STATUS "MIPS MSA:          Using architecture defaults")
-    endif()
-
     if(EIGEN_TEST_NEON)
       message(STATUS "ARM NEON:          ON")
     else()
@@ -498,11 +490,6 @@ macro(ei_testing_print_summary)
       endif()
     else()
       message(STATUS "CUDA:              OFF")
-    endif()
-    if(EIGEN_TEST_HIP)
-      message(STATUS "HIP:               ON (using hipcc)")
-    else()
-      message(STATUS "HIP:               OFF")
     endif()
 
   endif() # vectorization / alignment options
@@ -660,8 +647,6 @@ macro(ei_get_cxxflags VAR)
     set(${VAR} SSE3)
   elseif(EIGEN_TEST_SSE2 OR IS_64BIT_ENV)
     set(${VAR} SSE2)
-  elseif(EIGEN_TEST_MSA)
-    set(${VAR} MSA)
   endif()
 
   if(EIGEN_TEST_OPENMP)
@@ -692,10 +677,6 @@ macro(ei_set_build_string)
 
   if (NOT ${LOCAL_COMPILER_FLAGS} STREQUAL  "")
     set(TMP_BUILD_STRING ${TMP_BUILD_STRING}-${LOCAL_COMPILER_FLAGS})
-  endif()
-
-  if(EIGEN_TEST_EXTERNAL_BLAS)
-    set(TMP_BUILD_STRING ${TMP_BUILD_STRING}-external_blas)
   endif()
 
   ei_is_64bit_env(IS_64BIT_ENV)

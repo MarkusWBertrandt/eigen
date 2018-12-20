@@ -29,10 +29,14 @@ template<typename T, typename I> void test_incomplete_cholesky_T()
   CALL_SUBTEST( check_sparse_spd_solving(cg_illt_uplo_amd) );
 }
 
-template<int>
-void bug1150()
+void test_incomplete_cholesky()
 {
-  // regression for bug 1150
+  CALL_SUBTEST_1(( test_incomplete_cholesky_T<double,int>() ));
+  CALL_SUBTEST_2(( test_incomplete_cholesky_T<std::complex<double>, int>() ));
+  CALL_SUBTEST_3(( test_incomplete_cholesky_T<double,long int>() ));
+
+#ifdef EIGEN_TEST_PART_1
+    // regression for bug 1150
   for(int N = 1; N<20; ++N)
   {
     Eigen::MatrixXd b( N, N );
@@ -57,13 +61,5 @@ void bug1150()
     VERIFY(solver.preconditioner().info() == Eigen::Success);
     VERIFY(solver.info() == Eigen::Success);
   }
-}
-
-EIGEN_DECLARE_TEST(incomplete_cholesky)
-{
-  CALL_SUBTEST_1(( test_incomplete_cholesky_T<double,int>() ));
-  CALL_SUBTEST_2(( test_incomplete_cholesky_T<std::complex<double>, int>() ));
-  CALL_SUBTEST_3(( test_incomplete_cholesky_T<double,long int>() ));
-
-  CALL_SUBTEST_1(( bug1150<0>() ));
+#endif
 }
